@@ -12,3 +12,4 @@ To author your README use Visual Studio Code:
 * [Markdown Syntax Reference](http://daringfireball.net)
 
 ** Enjoy!**
+[junk]: http://somereference.com

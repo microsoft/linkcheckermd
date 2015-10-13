@@ -1,25 +1,22 @@
 {
-	"name": "vscode-linter.linkcheckMD",
-	"version": "0.0.1",
-	"publisher": "Larry Franks",
-	"engines": {
-		"vscode": "*"
-	},
-	"activationEvents": [
-		"command:extension.sayHello"
-	],
-	"main": "./out/extension",
-	"contributes": {
-		"commands": [{
-			"command": "extension.sayHello",
-			"title": "Hello World"
-		}]
-	},
-	"scripts": {
-		"vscode:prepublish": "node ./node_modules/vscode/bin/compile",
-		"compile": "node ./node_modules/vscode/bin/compile -watch -p ./"
-	},
-	"devDependencies": {
-		"vscode": "*"
-	}
+  "name": "vscode-linter.linkcheckMD",
+  "version": "0.0.1",
+  "publisher": "Larry Franks & Ralph Squillace",
+  "engines": {
+    "vscode": "*"
+  },
+  "activationEvents": [
+    "onLanguage:markdown"
+  ],
+  "main": "./out/extension",
+  "scripts": {
+    "vscode:prepublish": "node ./node_modules/vscode/bin/compile",
+    "compile": "node ./node_modules/vscode/bin/compile -watch -p ./"
+  },
+  "devDependencies": {
+    "vscode": "*"
+  },
+  "dependencies": {
+    "valid-url": "^1.0.9"
+  }
 }
