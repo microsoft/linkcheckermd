@@ -1,0 +1,25 @@
+{
+	"name": "vscode-linter.linkcheckMD",
+	"version": "0.0.1",
+	"publisher": "Larry Franks",
+	"engines": {
+		"vscode": "*"
+	},
+	"activationEvents": [
+		"command:extension.sayHello"
+	],
+	"main": "./out/extension",
+	"contributes": {
+		"commands": [{
+			"command": "extension.sayHello",
+			"title": "Hello World"
+		}]
+	},
+	"scripts": {
+		"vscode:prepublish": "node ./node_modules/vscode/bin/compile",
+		"compile": "node ./node_modules/vscode/bin/compile -watch -p ./"
+	},
+	"devDependencies": {
+		"vscode": "*"
+	}
+}
