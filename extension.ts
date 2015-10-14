@@ -55,12 +55,11 @@ class LinkChecker {
             if(links != null) {
                 // Get a count of links
                 let linkCount = links.length;
-                // Set the base message
-                //this._statusBarMessage = window.setStatusBarMessage(linkCount !== 1 ? `${linkCount} Links` : '1 link');
-                
                 // Retrieve only the links matching HTTP(S) URLs
                 let httpLinks = this.getHttpLinks(links);
-                this._statusBarMessage = window.setStatusBarMessage(`${linkCount} Links and ${httpLinks.length} HTTP(S) Links`);
+                // Count of HTTP links
+                let httpLinkCount = httpLinks.length;
+                
                 // Create some counters
                 let languageLinkCount=0;
                 let fourOhFourLinkCount=0;
@@ -75,6 +74,7 @@ class LinkChecker {
                         fourOhFourLinkCount++;
                     }
                 }
+                this._statusBarMessage = window.setStatusBarMessage(`${linkCount} Links and ${httpLinkCount} HTTP/S Links. ${languageLinkCount} are language links.`);
             }
         }
     }
@@ -85,20 +85,38 @@ class LinkChecker {
         }
     }
     
+    // Retrieve only links that are valid HTTP/S links
     public getHttpLinks(links: RegExpMatchArray) {
+        // An array to hold the links
         let httpLinks=[];
+        // Loop over inbound links and find the HTTP/S ones
         for(let i = 0; i < links.length; i++) {
-            let uri = links[i].match(/\[([^\[]+)\]\(([^\)]+)\)/);
-            console.log(uri);
-            if(validator.isURL(links[i])) {
-                httpLinks.push(links[i]);
+            // Use regex to extract only the URL from the Markdown link
+            let uri = links[i].match(/\[([^\[]+\]\(([^\)]+)\))|\[[a-zA-z0-9_-]+\]:\s*(\S+)/);
+            // TODO: Add error checking in case the match didn't find anything
+            
+            // Holder for the string to be validated
+            let linkToValidate="";
+            // If uri[3] doesn't exist, then it's an inline style link and we need to get the value of uri[2]
+            if(uri[3]==null) {
+                linkToValidate=uri[2];
+            } else {
+                linkToValidate=uri[3];
+            }
+            // Validate that it's an actual HTTP/S link
+            if(validator.isURL(linkToValidate)) {
+                // Add to the array to be returned
+                httpLinks.push(linkToValidate);
             }
         }
         return httpLinks;
     }
     
+    // Does the link contain a language specific link?
     public isLanguageLink(link) {
-        // TODO: make it go
+        if(link.match(/[a-z]{2}\-[a-z]{2}/)) {
+            return true;
+        }
         return false;
     }
     
