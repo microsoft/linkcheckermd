@@ -1,5 +1,6 @@
 // The some things from 'vscode', which contains the VS Code extensibility API
 import {window, commands, Disposable} from 'vscode';
+import validator = require('validator');
 
 // this method is called when your extension is activated
 // your extension is activated the very first time the command is executed
@@ -55,10 +56,11 @@ class LinkChecker {
                 // Get a count of links
                 let linkCount = links.length;
                 // Set the base message
-                this._statusBarMessage = window.setStatusBarMessage(linkCount !== 1 ? `${linkCount} Links` : '1 link');
+                //this._statusBarMessage = window.setStatusBarMessage(linkCount !== 1 ? `${linkCount} Links` : '1 link');
                 
                 // Retrieve only the links matching HTTP(S) URLs
                 let httpLinks = this.getHttpLinks(links);
+                this._statusBarMessage = window.setStatusBarMessage(`${linkCount} Links and ${httpLinks.length} HTTP(S) Links`);
                 // Create some counters
                 let languageLinkCount=0;
                 let fourOhFourLinkCount=0;
@@ -83,8 +85,16 @@ class LinkChecker {
         }
     }
     
-    public getHttpLinks(links) {
-        return [];
+    public getHttpLinks(links: RegExpMatchArray) {
+        let httpLinks=[];
+        for(let i = 0; i < links.length; i++) {
+            let uri = links[i].match(/\[([^\[]+)\]\(([^\)]+)\)/);
+            console.log(uri);
+            if(validator.isURL(links[i])) {
+                httpLinks.push(links[i]);
+            }
+        }
+        return httpLinks;
     }
     
     public isLanguageLink(link) {

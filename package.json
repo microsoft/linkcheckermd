@@ -17,6 +17,6 @@
     "vscode": "*"
   },
   "dependencies": {
-    "valid-url": "^1.0.9"
+    "validator": "^4.1.0"
   }
 }
