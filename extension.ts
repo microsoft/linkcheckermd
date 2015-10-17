@@ -1,5 +1,15 @@
 // The some things from 'vscode', which contains the VS Code extensibility API
-import {window, commands, Disposable} from 'vscode';
+import {
+    window, 
+    commands, 
+    languages, 
+    Diagnostic, 
+    DiagnosticSeverity,
+    Location,
+    Range,
+    Position,
+    Uri,
+    Disposable} from 'vscode';
 import validator = require('validator');
 
 // this method is called when your extension is activated
@@ -22,105 +32,103 @@ export function activate(disposables: Disposable[]) {
 // Checks links & displays status (so-far)
 class LinkChecker {
     // For writing to the status bar
-    private _statusBarMessage: Disposable;
-    
+    private _diagnostics: Diagnostic[];
+    private _uri: Uri;
+        
     // For disposing
     dispose() {
-        this.hideBrokenLinkCount();
+        this.hideBrokenLinks();
     }
     
     // Show the link count in the status bar
-    public showBrokenLinkCount() {
+    public showBrokenLinks() {
         //remove previous status bar message
-        this.hideBrokenLinkCount();
+        this.hideBrokenLinks();
         
         // Get the current text editor
         let editor = window.getActiveTextEditor();
         if(!editor) {
             return;
         }
+        
         // Geet the document
         let doc = editor.getTextDocument();
-        
+        // Set the uri
+        this._uri = doc.getUri();
         // Only update the status if a Markdown file
         if(doc.getLanguageId() === "markdown") {
-            // get the document text
+            // Get the document text
             let docContent = doc.getText();
-            
-            // Regex to find Markdown links
-            // FYI, captures for the link text and actuall link would be (/\[([^\[]+)\]\(([^\)]+)\)/);
-            let links = docContent.match(/\[[^\[]+\]\([^\)]+\)|\[[a-zA-z0-9_-]+\]:\s*\S+/g);
-            
-            // If there are actual links in the document
-            if(links != null) {
-                // Get a count of links
-                let linkCount = links.length;
-                // Retrieve only the links matching HTTP(S) URLs
-                let httpLinks = this.getHttpLinks(links);
-                // Count of HTTP links
-                let httpLinkCount = httpLinks.length;
-                
-                // Create some counters
-                let languageLinkCount=0;
-                let fourOhFourLinkCount=0;
-                // Loop through each link
-                for(let i = 0; i < httpLinks.length; i++) {
-                    // Is it a link with a language (en-us) in the URL?
-                    if(this.isLanguageLink(httpLinks[i])) {
-                        languageLinkCount++;
-                    }
-                    // Does it return a 404?
-                    if(this.isFourOhFourLink(httpLinks[i])) {
-                        fourOhFourLinkCount++;
+            // Get a count of the lines in thedocument
+            let lineCount = doc.getLineCount();
+            // Loop through the document, one line at a time
+            for(let lineNumber = 1; lineNumber != lineCount; lineNumber++) {
+                // Get the text for the current line
+                let lineText = doc.getTextOnLine(lineNumber);
+                // Are there links?
+                let links = lineText.match(/\[[^\[]+\]\([^\)]+\)|\[[a-zA-z0-9_-]+\]:\s*\S+/g);
+                if(links) {
+                    for(let i = 0; i < links.length; i++) {
+                        // Get the URL from each individual link
+                        // ([^\)]+) captures inline style link URLs
+                        // (\S+) captures reference style link URLs
+                        let link = links[i].match(/\[[^\[]+\]\(([^\)]+)\)|\[[a-zA-z0-9_-]+\]:\s*(\S+)/);
+                        // Figure out which capture contains the link; inline style or reference
+                        let linkToCheck = (link[2] == null) ? link[1] : link[2];
+                        // Is the link an HTTP/s URL?
+                        if(this.isHttpLink(linkToCheck)) {
+                            // Does it reference a specific language in the URL?
+                            let lang = this.isLanguageLink(linkToCheck);
+                            if(lang) {
+                                // Get the location within the document
+                                let loc = this.getLocation(link[0], lineText, lineNumber);
+                                // Create a diagnostic object
+                                let diag = new Diagnostic(DiagnosticSeverity.Warning,
+                                    loc, 
+                                    `Link contains a language reference: ${lang} `,
+                                    "linkcheckMD");
+                                // Push it on the array
+                                this._diagnostics.push(diag);
+                            }
+                        }
                     }
                 }
-                this._statusBarMessage = window.setStatusBarMessage(`${linkCount} Links and ${httpLinkCount} HTTP/S Links. ${languageLinkCount} are language links.`);
             }
+            // Add the array of diagnostics
+            languages.addDiagnostics(this._diagnostics);
         }
     }
     
-    public hideBrokenLinkCount() {
-        if(this._statusBarMessage) {
-            this._statusBarMessage.dispose();
-        }
+    // Generate a location object
+    private getLocation(link, lineText, lineNumber): Location {
+        let startPos = lineText.indexOf(link);
+        let endPos = startPos + link.length -1;
+        let start = new Position(lineNumber,startPos);
+        let end = new Position(lineNumber, endPos);
+        let range = new Range(start, end);
+        let loc = new Location(this._uri, range);
+        return loc;
     }
     
-    // Retrieve only links that are valid HTTP/S links
-    public getHttpLinks(links: RegExpMatchArray) {
-        // An array to hold the links
-        let httpLinks=[];
-        // Loop over inbound links and find the HTTP/S ones
-        for(let i = 0; i < links.length; i++) {
-            // Use regex to extract only the URL from the Markdown link
-            let uri = links[i].match(/\[([^\[]+\]\(([^\)]+)\))|\[[a-zA-z0-9_-]+\]:\s*(\S+)/);
-            // TODO: Add error checking in case the match didn't find anything
-            
-            // Holder for the string to be validated
-            let linkToValidate="";
-            // If uri[3] doesn't exist, then it's an inline style link and we need to get the value of uri[2]
-            if(uri[3]==null) {
-                linkToValidate=uri[2];
-            } else {
-                linkToValidate=uri[3];
-            }
-            // Validate that it's an actual HTTP/S link
-            if(validator.isURL(linkToValidate)) {
-                // Add to the array to be returned
-                httpLinks.push(linkToValidate);
-            }
-        }
-        return httpLinks;
+    public hideBrokenLinks() {
+        // Clear the array
+        this._diagnostics = new Array<Diagnostic>();
+        // And add it
+        languages.addDiagnostics(this._diagnostics);
+    }
+    
+    // Is this a valid HTTP/S link?
+    private isHttpLink(linkToCheck: string): boolean {
+        return validator.isURL(linkToCheck) ? true : false;
     }
     
     // Does the link contain a language specific link?
-    public isLanguageLink(link) {
-        if(link.match(/[a-z]{2}\-[a-z]{2}/)) {
-            return true;
-        }
-        return false;
+    private isLanguageLink(linkToCheck) {
+        let langMatch = linkToCheck.match(/[a-z]{2}\-[a-z]{2}/);
+        return langMatch ? langMatch[0] : null;
     }
     
-    public isFourOhFourLink(link) {
+    private isFourOhFourLink(link) {
         // TODO: make it go
         return false;
     }
@@ -132,7 +140,7 @@ class LinkCheckController {
     
     constructor(linkChecker: LinkChecker) {
         this._linkChecker = linkChecker;
-        this._linkChecker.showBrokenLinkCount();
+        this._linkChecker.showBrokenLinks();
         
         // Subscribe to selection changes
         let subscriptions: Disposable[] = [];
@@ -148,7 +156,7 @@ class LinkCheckController {
     }
     
     private _onEvent() {
-        this._linkChecker.showBrokenLinkCount();
+        this._linkChecker.showBrokenLinks();
     }
 }
 
