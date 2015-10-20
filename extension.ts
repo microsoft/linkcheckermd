@@ -124,7 +124,7 @@ class LinkChecker {
     
     // Does the link contain a language specific link?
     private isLanguageLink(linkToCheck) {
-        let langMatch = linkToCheck.match(/[a-z]{2}\-[a-z]{2}/);
+        let langMatch = linkToCheck.match(/\/[a-z]{2}\-[a-z]{2}\//);
         return langMatch ? langMatch[0] : null;
     }
     
