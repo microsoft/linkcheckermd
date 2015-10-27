@@ -97,7 +97,7 @@ class LinkChecker {
                         // For each link, generate a promise to return a diagnostic
                         let brokenLinks = new Promise<Diagnostic>((resolve, reject) => {
                             // Promise to check broken links
-                            brokenLink(link.address).then((answer) => {
+                            brokenLink(link.address, {allow404Pages: true}).then((answer) => {
                                 let brokenLinkDiag: Diagnostic = null;
                                 // If it is broken, create and return a promise
                                 if(answer) {
