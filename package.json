@@ -17,6 +17,7 @@
     "vscode": "*"
   },
   "dependencies": {
+    "broken-link": "^1.0.1",
     "validator": "^4.1.0"
   }
 }
