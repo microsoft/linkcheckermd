@@ -70,63 +70,40 @@ class LinkChecker {
             
             // Only update the status if a Markdown file
             if(doc.getLanguageId() === "markdown") {
-                //Dispose of any previous diagnostics, because things changed
-                this.disposeCurrentDiagnostics;
-                //Get an array of markdown links in the document...
+                //Get a promise for an array of markdown links in the document, then...
                 getLinks(doc).then((links) => {
-                    // Get a promise for each link in the array
-                    // and wait for all of them to complete
-                    Promise.all<Diagnostic>(links.map((link): Diagnostic => {
+                    // Iterate over the array, generating an array of promises
+                    let countryCodePromise = Promise.all<Diagnostic>(links.map((link): Diagnostic => {
                         // For each link, check the country code...
                         return isCountryCodeLink(link, this._uri);
                         // Then, when they are all done..
-                    })).then((diagnostics) => {
-                        // Filter out the links that are null
-                        let filteredDiagnostics = diagnostics.filter(diagnostic => diagnostic != null);
-                        // Were there any actual diagnostics
-                        if(filteredDiagnostics.length > 0) {
-                            // Add then to the document and set to current
-                            this._currentDiagnostics = languages.addDiagnostics(filteredDiagnostics);
-                        }
-                    });
-                    // Get only valid HTTP links
+                    }));
+                    
+                    // Find the links that are only HTTP/s URIs
                     let httpLinks = links.filter(value => isHttpLink(value.address));
-                    // Get a promise for each link in the array
-                    // and wait for all of them to complete
-                    Promise.all<any>(httpLinks.map((link): Promise<any> => {
+                    // Iterate over the array of HTTP/s linnks and get an array of promises
+                    let brokenLinkPromise = Promise.all<Diagnostic>(httpLinks.map((link): Promise<Diagnostic> => {
+                        let countryCodeDiag = isCountryCodeLink(link, this._uri);
                         // For each link, generate a promise to return a diagnostic
-                        let brokenLinks = new Promise<Diagnostic>((resolve, reject) => {
-                            // Promise to check broken links
-                            brokenLink(link.address, {allow404Pages: true}).then((answer) => {
-                                let brokenLinkDiag: Diagnostic = null;
-                                // If it is broken, create and return a promise
-                                if(answer) {
-                                    brokenLinkDiag = createDiagnostic(
-                                        DiagnosticSeverity.Error,
-                                        link.text,
-                                        link.lineText,
-                                        link.lineNumber,
-                                        this._uri,
-                                        "Link is unreachable"
-                                    );
-                                }
-                                // Resolve the promise by returning the diagnostic
-                                resolve(brokenLinkDiag);
-                            });
-                        });
-                        // Return the promise
-                        return brokenLinks;
+                        if(isHttpLink)
+                            return getBrokenLinkPromise(link, this._uri);
                         // Then, when all the promises have completed
-                    })).then((diagnostics) => {
-                        console.log("OMG, here!");
-                        // Filter out the links that are null
-                        let filteredDiagnostics = diagnostics.filter(diagnostic => diagnostic != null);
-                        // Were there any actual diagnostics
-                        if(filteredDiagnostics.length > 0) {
-                            // Add then to the document and set to current
-                            this._currentDiagnostics = languages.addDiagnostics(filteredDiagnostics);
-                        }
-                    });
+                    }));
+                    
+                    // Finally, let's complete the promise for country code...
+                    countryCodePromise.then((countryCodeDiag) => {
+                        // And broken links...
+                        brokenLinkPromise.then((brokenLinkDiag) => {
+                            // And le's combine the array of diagnostics
+                            let allDiag = countryCodeDiag.concat(brokenLinkDiag);
+                            // Then filter out null ones
+                            let filteredDiag = allDiag.filter(diagnostic => diagnostic != null);
+                            // Then dispose of current diags
+                            this.disposeCurrentDiagnostics;
+                            // Then add the new ones
+                            this._currentDiagnostics = languages.addDiagnostics(filteredDiag);
+                        })
+                    })
                 }).catch(); // do nothing; no links were found
             }
         } catch(err) {
@@ -141,6 +118,29 @@ class LinkChecker {
     }
 }
 
+// Get promise for broken links
+function getBrokenLinkPromise(link: Link, documentUri: Uri): Promise<Diagnostic> {
+    return new Promise<Diagnostic>((resolve, reject) => {
+        // Promise to check the link
+        brokenLink(link.address, {allow404Pages: true}).then((answer) => {
+            let brokenLinkDiag: Diagnostic = null;
+            // If it is broken, create and return a promise
+            if(answer) {
+                brokenLinkDiag = createDiagnostic(
+                    DiagnosticSeverity.Error,
+                    link.text,
+                    link.lineText,
+                    link.lineNumber,
+                    documentUri,
+                    "Link is unreachable"
+                );
+            }
+            // Resolve the promise by returning the diagnostic
+            resolve(brokenLinkDiag);
+        });
+    });
+}
+                        
 // Parse the MD style links out of the document
 function getLinks(document: TextDocument): Promise<Link[]> {
     // Return a promise, since this might take a while for large documents
