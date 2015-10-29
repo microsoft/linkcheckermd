@@ -132,7 +132,7 @@ function getBrokenLinkPromise(link: Link, documentUri: Uri): Promise<Diagnostic>
                     link.lineText,
                     link.lineNumber,
                     documentUri,
-                    "Link is unreachable"
+                    `Link ${link.address} is unreachable`
                 );
             }
             // Resolve the promise by returning the diagnostic
@@ -199,7 +199,7 @@ function isCountryCodeLink(link: Link, documentUri: Uri): Diagnostic {
             link.lineText,
             link.lineNumber,
             documentUri,
-            `Link contains a language reference: ${hasCountryCode[0]} `
+            `Link ${link.address} contains a language reference: ${hasCountryCode[0]} `
         );
     }
     return countryCodeDiag;
