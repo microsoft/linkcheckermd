@@ -78,32 +78,15 @@ class LinkChecker {
                         return isCountryCodeLink(link, this._uri);
                         // Then, when they are all done..
                     }));
-                    
-                    // Find the links that are only HTTP/s URIs
-                    let httpLinks = links.filter(value => isHttpLink(value.address));
-                    // Iterate over the array of HTTP/s linnks and get an array of promises
-                    let brokenLinkPromise = Promise.all<Diagnostic>(httpLinks.map((link): Promise<Diagnostic> => {
-                        let countryCodeDiag = isCountryCodeLink(link, this._uri);
-                        // For each link, generate a promise to return a diagnostic
-                        if(isHttpLink)
-                            return getBrokenLinkPromise(link, this._uri);
-                        // Then, when all the promises have completed
-                    }));
-                    
                     // Finally, let's complete the promise for country code...
                     countryCodePromise.then((countryCodeDiag) => {
-                        // And broken links...
-                        brokenLinkPromise.then((brokenLinkDiag) => {
-                            // And le's combine the array of diagnostics
-                            let allDiag = countryCodeDiag.concat(brokenLinkDiag);
                             // Then filter out null ones
-                            let filteredDiag = allDiag.filter(diagnostic => diagnostic != null);
+                            let filteredDiag = countryCodeDiag.filter(diagnostic => diagnostic != null);
                             // Then dispose of current diags
                             this.disposeCurrentDiagnostics;
                             // Then add the new ones
                             this._currentDiagnostics = languages.addDiagnostics(filteredDiag);
                         })
-                    })
                 }).catch(); // do nothing; no links were found
             }
         } catch(err) {
@@ -115,6 +98,42 @@ class LinkChecker {
             }
             throw err;
         }
+    }
+}
+
+// Check for broken links
+/*
+* This is where we check for broken links by actually requesting the link.
+* This took too long to perform in real time as the user changes the document,
+* so now it's triggered by Alt+L and the user will wait around for the results
+*/
+function checkBrokenLinks() {
+    let editor = window.getActiveTextEditor;
+    if(!editor) {
+        return;
+    }
+    try {
+        //TBD waiting on info for using outputChannel
+        
+        // Find the links that are only HTTP/s URIs
+                    // let httpLinks = links.filter(value => isHttpLink(value.address));
+                    // Iterate over the array of HTTP/s linnks and get an array of promises
+                    // let brokenLinkPromise = Promise.all<Diagnostic>(httpLinks.map((link): Promise<Diagnostic> => {
+                    //     let countryCodeDiag = isCountryCodeLink(link, this._uri);
+                    //     // For each link, generate a promise to return a diagnostic
+                    //     if(isHttpLink)
+                    //         return getBrokenLinkPromise(link, this._uri);
+                    //     // Then, when all the promises have completed
+                    // }));
+                    
+    } catch(err) {
+        let message: string=null;
+        if(typeof err.message==='string' || err.message instanceof String) {
+            message = <string>err.message;
+            message = message.replace(/\r?\n/g, ' ');
+            throw new Error(message);
+        }
+        throw err;
     }
 }
 
@@ -132,7 +151,7 @@ function getBrokenLinkPromise(link: Link, documentUri: Uri): Promise<Diagnostic>
                     link.lineText,
                     link.lineNumber,
                     documentUri,
-                    "Link is unreachable"
+                    `Link ${link.address} is unreachable`
                 );
             }
             // Resolve the promise by returning the diagnostic
@@ -199,7 +218,7 @@ function isCountryCodeLink(link: Link, documentUri: Uri): Diagnostic {
             link.lineText,
             link.lineNumber,
             documentUri,
-            `Link contains a language reference: ${hasCountryCode[0]} `
+            `Link ${link.address} contains a language reference: ${hasCountryCode[0]} `
         );
     }
     return countryCodeDiag;
@@ -234,6 +253,9 @@ class LinkCheckController {
     constructor(linkChecker: LinkChecker) {
         this._linkChecker = linkChecker;
         this._linkChecker.diagnoseLinks();
+        
+        // Register a command (broken link check)
+        commands.registerCommand('extension.checkBrokenLinks', checkBrokenLinks);
         
         // Subscribe to selection changes
         let subscriptions: Disposable[] = [];
