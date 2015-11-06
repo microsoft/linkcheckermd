@@ -13,6 +13,21 @@
     "vscode:prepublish": "node ./node_modules/vscode/bin/compile",
     "compile": "node ./node_modules/vscode/bin/compile -watch -p ./"
   },
+  "contributes": {
+    "commands": [
+      {
+        "command": "extension.checkBrokenLinks",
+        "title": "Check broken links",
+        "description": "Checks for broken HTTP/s links in a Markdown document"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "extension.checkBrokenLinks",
+        "key": "Alt+L"
+      }
+    ]
+  },
   "devDependencies": {
     "vscode": "*"
   },
