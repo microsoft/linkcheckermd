@@ -5,12 +5,14 @@ import {
     languages, 
     Diagnostic, 
     DiagnosticSeverity,
+    DiagnosticCollection,
     Location,
     Range,
     Position,
     Uri,
     Disposable,
-    TextDocument} from 'vscode';
+    TextDocument,
+    TextLine} from 'vscode';
 // For HTTP/s address validation
 import validator = require('validator');
 // For checking broken links
@@ -20,8 +22,7 @@ import brokenLink = require('broken-link');
 interface Link {
     text: string
     address: string
-    lineNumber: number
-    lineText: string
+    lineText: TextLine
 }
 
 // this method is called when your extension is activated
@@ -31,51 +32,52 @@ export function activate(disposables: Disposable[]) {
     let linkChecker = new LinkChecker();
     let controller = new LinkCheckController(linkChecker);
     
-    // Dispose of stuff.
+    // Dispose of stuff
     disposables.push(controller);
-    disposables.push(linkChecker);
+    //disposables.push(linkChecker);
 }
 
 // Checks links & displays status (so-far)
 class LinkChecker {
-    // For writing to the status bar
-    private _currentDiagnostics: Disposable;
-    private _uri: Uri;
-        
+    // Diagnostics messages for the document
+    private _diagnostics: DiagnosticCollection;
+    // private _uri: Uri;
+    
+    constructor() {
+        this._diagnostics=languages.createDiagnosticCollection();
+    }
     // For disposing
     dispose() {
-        this.disposeCurrentDiagnostics;
+        this.disposeDiagnostics;
     }
     
     // Dispose of current diagnostics
-    private disposeCurrentDiagnostics() { 
-         if(this._currentDiagnostics) {
-             this._currentDiagnostics.dispose();
+    private disposeDiagnostics() { 
+         if(this._diagnostics) {
+             this._diagnostics.dispose();
          }
      }
      
     // Show the link count in the status bar
     public diagnoseLinks() {
         // Get the current text editor
-        let editor = window.getActiveTextEditor();
+        let editor = window.activeTextEditor;
         // If it's not an editor, return
         if(!editor) {
             return;
         }
         try {
             // Get the document
-            let doc = editor.getTextDocument();
-            // Get the document uri
-            this._uri = doc.getUri();
+            let doc = editor.document;
             
             // Only update the status if a Markdown file
-            if(doc.getLanguageId() === "markdown") {
+            if(doc.languageId === "markdown") {
                 //Get a promise for an array of markdown links in the document, then...
                 getLinks(doc).then((links) => {
                     // Iterate over the array, generating an array of promises
                     let countryCodePromise = Promise.all<Diagnostic>(links.map((link): Diagnostic => {
                         // For each link, check the country code...
-                        return isCountryCodeLink(link, this._uri);
+                        return isCountryCodeLink(link);
                         // Then, when they are all done..
                     }));
                     // Finally, let's complete the promise for country code...
@@ -83,9 +85,9 @@ class LinkChecker {
                             // Then filter out null ones
                             let filteredDiag = countryCodeDiag.filter(diagnostic => diagnostic != null);
                             // Then dispose of current diags
-                            this.disposeCurrentDiagnostics;
+                            this.disposeDiagnostics;
                             // Then add the new ones
-                            this._currentDiagnostics = languages.addDiagnostics(filteredDiag);
+                            this._diagnostics.set(doc.uri, filteredDiag);
                         })
                 }).catch(); // do nothing; no links were found
             }
@@ -108,7 +110,7 @@ class LinkChecker {
 * so now it's triggered by Alt+L and the user will wait around for the results
 */
 function checkBrokenLinks() {
-    let editor = window.getActiveTextEditor;
+    let editor = window.activeTextEditor;
     if(!editor) {
         return;
     }
@@ -138,7 +140,7 @@ function checkBrokenLinks() {
 }
 
 // Get promise for broken links
-function getBrokenLinkPromise(link: Link, documentUri: Uri): Promise<Diagnostic> {
+function getBrokenLinkPromise(link: Link): Promise<Diagnostic> {
     return new Promise<Diagnostic>((resolve, reject) => {
         // Promise to check the link
         brokenLink(link.address, {allow404Pages: true}).then((answer) => {
@@ -149,8 +151,6 @@ function getBrokenLinkPromise(link: Link, documentUri: Uri): Promise<Diagnostic>
                     DiagnosticSeverity.Error,
                     link.text,
                     link.lineText,
-                    link.lineNumber,
-                    documentUri,
                     `Link ${link.address} is unreachable`
                 );
             }
@@ -167,14 +167,14 @@ function getLinks(document: TextDocument): Promise<Link[]> {
         // Create arrays to hold links as we parse them out
         let linksToReturn = new Array<Link>();
         // Get lines in the document
-        let lineCount = document.getLineCount();
+        let lineCount = document.lineCount;
         
         //Loop over the lines in a document
-        for(let lineNumber = 1; lineNumber <= lineCount; lineNumber++) {
+        for(let lineNumber = 0; lineNumber < lineCount; lineNumber++) {
             // Get the text for the current line
-            let lineText = document.getTextOnLine(lineNumber);
+            let lineText = document.lineAt(lineNumber);
             // Are there links?
-            let links = lineText.match(/\[[^\[]+\]\([^\)]+\)|\[[a-zA-z0-9_-]+\]:\s*\S+/g);
+            let links = lineText.text.match(/\[[^\[]+\]\([^\)]+\)|\[[a-zA-z0-9_-]+\]:\s*\S+/g);
             if(links) {
                 // Iterate over the links found on this line
                 for(let i = 0; i< links.length; i++) {
@@ -188,7 +188,6 @@ function getLinks(document: TextDocument): Promise<Link[]> {
                     linksToReturn.push({
                         text: link[0],
                         address: address,
-                        lineNumber: lineNumber,
                         lineText: lineText
                     });
                 }
@@ -205,7 +204,7 @@ function getLinks(document: TextDocument): Promise<Link[]> {
 }
 
 // Check for addresses that contain country codes
-function isCountryCodeLink(link: Link, documentUri: Uri): Diagnostic {
+function isCountryCodeLink(link: Link): Diagnostic {
     let countryCodeDiag=null;
     //Regex for country-code
     let hasCountryCode = link.address.match(/\/[a-z]{2}\-[a-z]{2}\//);
@@ -216,8 +215,6 @@ function isCountryCodeLink(link: Link, documentUri: Uri): Diagnostic {
             DiagnosticSeverity.Warning,
             link.text,
             link.lineText,
-            link.lineNumber,
-            documentUri,
             `Link ${link.address} contains a language reference: ${hasCountryCode[0]} `
         );
     }
@@ -231,17 +228,16 @@ function isHttpLink(linkToCheck: string): boolean {
 }
 
 // Generate a diagnostic object
-function createDiagnostic(severity: DiagnosticSeverity, markdownLink, lineText, lineNumber, uri, message): Diagnostic {
+function createDiagnostic(severity: DiagnosticSeverity, markdownLink, lineText: TextLine, message): Diagnostic {
     // Get the location of the text in the document
     // based on position within the line of text it occurs in
-    let startPos = lineText.indexOf(markdownLink);
+    let startPos = lineText.text.indexOf(markdownLink);
     let endPos = startPos + markdownLink.length -1;
-    let start = new Position(lineNumber,startPos);
-    let end = new Position(lineNumber, endPos);
+    let start = new Position(lineText.lineNumber,startPos);
+    let end = new Position(lineText.lineNumber, endPos);
     let range = new Range(start, end);
-    let loc = new Location(uri, range);
     // Create the diagnostic object
-    let diag = new Diagnostic(severity, loc, message);
+    let diag = new Diagnostic(range, message, severity);
     // Return the diagnostic
     return diag;
 }
@@ -263,7 +259,7 @@ class LinkCheckController {
         window.onDidChangeActiveTextEditor(this._onEvent, this, subscriptions);
 
         // create a combined disposable from both event subscriptions
-        this._disposable = Disposable.of(...subscriptions);
+        this._disposable = Disposable.from(...subscriptions);
     }
     
     dispose() {

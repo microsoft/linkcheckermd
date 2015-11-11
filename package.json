@@ -3,7 +3,7 @@
   "version": "0.0.1",
   "publisher": "Larry Franks & Ralph Squillace",
   "engines": {
-    "vscode": "*"
+    "vscode": "0.10.x"
   },
   "activationEvents": [
     "onLanguage:markdown"
