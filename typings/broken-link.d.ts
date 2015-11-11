@@ -10,6 +10,6 @@ interface IBrokenLinkOptions {
 }
 
 declare module "broken-link" {
-  function brokenLink(url: string, options?: IBrokenLinkOptions): Promise<boolean>;
+  function brokenLink(url: string, options?: IBrokenLinkOptions): Promise<any>;
   export = brokenLink;
 }
