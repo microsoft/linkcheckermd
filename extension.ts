@@ -112,7 +112,8 @@ function checkBrokenLinks() {
                         // Find the directory from the path to the current document
                         let currentWorkingDirectory = path.dirname(document.fileName);
                         // Use that to resolve the full path from the relative link address
-                        let fullPath = path.resolve(currentWorkingDirectory, link.address);
+                        // The `.split('#')[0]` at the end is so that relative links that also reference an anchor in the document will work with file checking.
+                        let fullPath = path.resolve(currentWorkingDirectory, link.address).split('#')[0];
                         // Check if the file exists and log appropriately
                         if(fs.existsSync(fullPath)) {
                             outputChannel.appendLine(`OK: ${link.address} on line ${link.lineText.lineNumber}.`);
