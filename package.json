@@ -1,7 +1,26 @@
 {
-  "name": "vscode-linter.linkcheckMD",
-  "version": "0.0.1",
+  "name": "LinkCheck",
+  "displayName": "HTTP/s and relative link checker",
+  "description": "Checks Markdown links for the presence of a country-code as you type and flags as a warning. Checks whether HTTP/s links or relative links are reachable when you press Alt+L.",
+  "version": "0.1.0",
   "publisher": "Larry Franks & Ralph Squillace",
+  "galleryBanner": {
+    "color": "#0000FF",
+    "theme": "dark"
+  },
+  "license": "See LICENSE.md",
+  "bugs": {
+    "url": "https://github.com/microsoft/linkcheckermd/issues",
+    "email": "larryfr@microsoft.com"
+  },
+  "homepage": "https://github.com/microsoft/linkcheckermd/blob/master/README.md",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/microsoft/linkcheckermd.git"
+  },
+  "categories": [
+    "Linters", "Other"
+  ],
   "engines": {
     "vscode": "0.10.x"
   },
@@ -17,8 +36,7 @@
     "commands": [
       {
         "command": "extension.checkBrokenLinks",
-        "title": "Check broken links",
-        "description": "Checks for broken HTTP/s links in a Markdown document"
+        "title": "Remove country-code suggestions"
       }
     ],
     "keybindings": [

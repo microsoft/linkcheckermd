@@ -20,6 +20,9 @@ import {
 import validator = require('validator');
 // For checking broken links
 import brokenLink = require('broken-link');
+// For checking relative URIs against the local file system
+import path = require('path');
+import fs = require('fs');
 
 //Interface for links
 interface Link {
@@ -87,19 +90,42 @@ function checkBrokenLinks() {
     
     // Get all Markdown style lnks in the document
     getLinks(document).then((links) => {
-        // We only want links that are to HTTP/s addresses
-        let httpLinks=links.filter(link => isHttpLink(link.address));
-        // Loop over those
-        httpLinks.forEach(link => {
-            // And check if they are broken or not.
-            brokenLink(link.address, {allowRedirects: true}).then((answer) => {
-                // Log to the outputChannel
-                if(answer) {
-                    outputChannel.appendLine(`Broken: ${link.address} on line ${link.lineText.lineNumber} is unreachable.`);
+        // Loop over the links
+        links.forEach(link => {
+            // Is it an HTTPS link or a relative link?
+            if(isHttpLink(link.address)) {
+                // And check if they are broken or not.
+                brokenLink(link.address, {allowRedirects: true}).then((answer) => {
+                    // Log to the outputChannel
+                    if(answer) {
+                        outputChannel.appendLine(`Broken: ${link.address} on line ${link.lineText.lineNumber} is unreachable.`);
+                    } else {
+                        outputChannel.appendLine(`OK: ${link.address} on line ${link.lineText.lineNumber}.`);
+                    }
+                });
+            } else {
+                if(isFtpLink(link.address)) {
+                    // We don't do anything with FTP
+                    outputChannel.appendLine(`Unknown: ${link.address} on line ${link.lineText.lineNumber} is an FTP link.`);
                 } else {
-                    outputChannel.appendLine(`OK: ${link.address} on line ${link.lineText.lineNumber}.`);
+                    // Must be a relative path, but might not be, so try it...
+                    try {
+                        // Find the directory from the path to the current document
+                        let currentWorkingDirectory = path.dirname(document.fileName);
+                        // Use that to resolve the full path from the relative link address
+                        let fullPath = path.resolve(currentWorkingDirectory, link.address);
+                        // Check if the file exists and log appropriately
+                        if(fs.existsSync(fullPath)) {
+                            outputChannel.appendLine(`OK: ${link.address} on line ${link.lineText.lineNumber}.`);
+                        } else {
+                            outputChannel.appendLine(`Broken: ${link.address} on line ${link.lineText.lineNumber} does not exist.`);
+                        }
+                    } catch (error) {
+                        // If there's an error, log the link
+                        outputChannel.appendLine(`ERROR: ${link.address} on line ${link.lineText.lineNumber} is not an HTTP/s or relative link.`);
+                    }
                 }
-            });
+            }
         });
     });
 }
@@ -168,7 +194,12 @@ function isCountryCodeLink(link: Link): Diagnostic {
 // Is this a valid HTTP/S link?
 function isHttpLink(linkToCheck: string): boolean {
     // Use the validator to avoid writing URL checking logic
-    return validator.isURL(linkToCheck, {require_protocol: true}) ? true : false;
+    return validator.isURL(linkToCheck, {require_protocol: true, protocols: ['http','https']}) ? true : false;
+}
+
+// Is this an FTP link?
+function isFtpLink(linkToCheck: string): boolean {
+    return linkToCheck.toLowerCase().startsWith('ftp');
 }
 
 // Generate a diagnostic object
@@ -185,4 +216,3 @@ function createDiagnostic(severity: DiagnosticSeverity, markdownLink, lineText: 
     // Return the diagnostic
     return diag;
 }
-
