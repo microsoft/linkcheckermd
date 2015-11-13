@@ -1,5 +1,6 @@
 // The some things from 'vscode', which contains the VS Code extensibility API
 import {
+    workspace,
     window, 
     commands, 
     languages, 
@@ -8,15 +9,20 @@ import {
     DiagnosticCollection,
     Location,
     Range,
+    OutputChannel,
     Position,
     Uri,
     Disposable,
     TextDocument,
-    TextLine} from 'vscode';
+    TextLine,
+    ViewColumn} from 'vscode';
 // For HTTP/s address validation
 import validator = require('validator');
 // For checking broken links
 import brokenLink = require('broken-link');
+// For checking relative URIs against the local file system
+import path = require('path');
+import fs = require('fs');
 
 //Interface for links
 interface Link {
@@ -28,138 +34,102 @@ interface Link {
 // this method is called when your extension is activated
 // your extension is activated the very first time the command is executed
 export function activate(disposables: Disposable[]) { 
-    // Create the checker and controller
-    let linkChecker = new LinkChecker();
-    let controller = new LinkCheckController(linkChecker);
+    // Create the diagnostics collection
+    let diagnostics = languages.createDiagnosticCollection();
     
-    // Dispose of stuff
-    disposables.push(controller);
-    //disposables.push(linkChecker);
+    console.log("Link checker active");
+    
+    // Wire up onChange events
+    workspace.onDidChangeTextDocument(event => {
+        checkLinks(event.document, diagnostics)
+    }, undefined, disposables);
+    
+    workspace.onDidOpenTextDocument(event => {
+        checkLinks(event, diagnostics);
+    }, undefined, disposables);
+    
+    commands.registerCommand('extension.checkBrokenLinks', checkBrokenLinks);
 }
 
-// Checks links & displays status (so-far)
-class LinkChecker {
-    // Diagnostics messages for the document
-    private _diagnostics: DiagnosticCollection;
-    // private _uri: Uri;
-    
-    constructor() {
-        this._diagnostics=languages.createDiagnosticCollection();
-    }
-    // For disposing
-    dispose() {
-        this.disposeDiagnostics;
-    }
-    
-    // Dispose of current diagnostics
-    private disposeDiagnostics() { 
-         if(this._diagnostics) {
-             this._diagnostics.dispose();
-         }
-     }
-     
-    // Show the link count in the status bar
-    public diagnoseLinks() {
-        // Get the current text editor
-        let editor = window.activeTextEditor;
-        // If it's not an editor, return
-        if(!editor) {
-            return;
-        }
-        try {
-            // Get the document
-            let doc = editor.document;
-            
-            // Only update the status if a Markdown file
-            if(doc.languageId === "markdown") {
-                //Get a promise for an array of markdown links in the document, then...
-                getLinks(doc).then((links) => {
-                    // Iterate over the array, generating an array of promises
-                    let countryCodePromise = Promise.all<Diagnostic>(links.map((link): Diagnostic => {
-                        // For each link, check the country code...
-                        return isCountryCodeLink(link);
-                        // Then, when they are all done..
-                    }));
-                    // Finally, let's complete the promise for country code...
-                    countryCodePromise.then((countryCodeDiag) => {
-                            // Then filter out null ones
-                            let filteredDiag = countryCodeDiag.filter(diagnostic => diagnostic != null);
-                            // Then dispose of current diags
-                            this.disposeDiagnostics;
-                            // Then add the new ones
-                            this._diagnostics.set(doc.uri, filteredDiag);
-                        })
-                }).catch(); // do nothing; no links were found
-            }
-        } catch(err) {
-            let message: string=null;
-            if(typeof err.message==='string' || err.message instanceof String) {
-                message = <string>err.message;
-                message = message.replace(/\r?\n/g, ' ');
-                throw new Error(message);
-            }
-            throw err;
-        }
-    }
-}
-
-// Check for broken links
 /*
-* This is where we check for broken links by actually requesting the link.
-* This took too long to perform in real time as the user changes the document,
-* so now it's triggered by Alt+L and the user will wait around for the results
+* Checks links for errors. Currently this is just checking for a country code.
+* For example, /en-us/ in the URL.
+*
+* NOTE: Checking for broken links is not integrated in this, as checking for
+* those takes a long time, and this function needs to generate diagnostics every
+* time the document changes, so needs to complete quickly
 */
-function checkBrokenLinks() {
-    let editor = window.activeTextEditor;
-    if(!editor) {
-        return;
-    }
-    try {
-        //TBD waiting on info for using outputChannel
-        
-        // Find the links that are only HTTP/s URIs
-                    // let httpLinks = links.filter(value => isHttpLink(value.address));
-                    // Iterate over the array of HTTP/s linnks and get an array of promises
-                    // let brokenLinkPromise = Promise.all<Diagnostic>(httpLinks.map((link): Promise<Diagnostic> => {
-                    //     let countryCodeDiag = isCountryCodeLink(link, this._uri);
-                    //     // For each link, generate a promise to return a diagnostic
-                    //     if(isHttpLink)
-                    //         return getBrokenLinkPromise(link, this._uri);
-                    //     // Then, when all the promises have completed
-                    // }));
-                    
-    } catch(err) {
-        let message: string=null;
-        if(typeof err.message==='string' || err.message instanceof String) {
-            message = <string>err.message;
-            message = message.replace(/\r?\n/g, ' ');
-            throw new Error(message);
-        }
-        throw err;
-    }
+function checkLinks(document: TextDocument, diagnostics: DiagnosticCollection) {
+    //Clear the diagnostics because we're sending new ones each time
+    diagnostics.clear();
+    // Get all Markdown style lnks in the document
+    getLinks(document).then((links) => {
+        // Iterate over the array, generating an array of promises
+        let countryCodePromise = Promise.all<Diagnostic>(links.map((link): Diagnostic => {
+            // For each link, check the country code...
+            return isCountryCodeLink(link);
+            // Then, when they are all done..
+        }));
+        // Finally, let's complete the promise for country code...
+        countryCodePromise.then((countryCodeDiag) => {
+                // Then filter out null ones
+                let filteredDiag = countryCodeDiag.filter(diagnostic => diagnostic != null);
+                // Then add the diagnostics
+                diagnostics.set(document.uri, filteredDiag);
+            })
+    }).catch();
 }
 
-// Get promise for broken links
-function getBrokenLinkPromise(link: Link): Promise<Diagnostic> {
-    return new Promise<Diagnostic>((resolve, reject) => {
-        // Promise to check the link
-        brokenLink(link.address, {allow404Pages: true}).then((answer) => {
-            let brokenLinkDiag: Diagnostic = null;
-            // If it is broken, create and return a promise
-            if(answer) {
-                brokenLinkDiag = createDiagnostic(
-                    DiagnosticSeverity.Error,
-                    link.text,
-                    link.lineText,
-                    `Link ${link.address} is unreachable`
-                );
+function checkBrokenLinks() {
+    // Get the current document
+    let document = window.activeTextEditor.document;
+    // Create an output channel for displaying broken links
+    let outputChannel = window.createOutputChannel("Checked links");
+    // Show the output channel in column three
+    outputChannel.show(ViewColumn.Three);
+    
+    // Get all Markdown style lnks in the document
+    getLinks(document).then((links) => {
+        // Loop over the links
+        links.forEach(link => {
+            // Is it an HTTPS link or a relative link?
+            if(isHttpLink(link.address)) {
+                // And check if they are broken or not.
+                brokenLink(link.address, {allowRedirects: true}).then((answer) => {
+                    // Log to the outputChannel
+                    if(answer) {
+                        outputChannel.appendLine(`Broken: ${link.address} on line ${link.lineText.lineNumber} is unreachable.`);
+                    } else {
+                        outputChannel.appendLine(`OK: ${link.address} on line ${link.lineText.lineNumber}.`);
+                    }
+                });
+            } else {
+                if(isFtpLink(link.address)) {
+                    // We don't do anything with FTP
+                    outputChannel.appendLine(`Unknown: ${link.address} on line ${link.lineText.lineNumber} is an FTP link.`);
+                } else {
+                    // Must be a relative path, but might not be, so try it...
+                    try {
+                        // Find the directory from the path to the current document
+                        let currentWorkingDirectory = path.dirname(document.fileName);
+                        // Use that to resolve the full path from the relative link address
+                        let fullPath = path.resolve(currentWorkingDirectory, link.address);
+                        // Check if the file exists and log appropriately
+                        if(fs.existsSync(fullPath)) {
+                            outputChannel.appendLine(`OK: ${link.address} on line ${link.lineText.lineNumber}.`);
+                        } else {
+                            outputChannel.appendLine(`Broken: ${link.address} on line ${link.lineText.lineNumber} does not exist.`);
+                        }
+                    } catch (error) {
+                        // If there's an error, log the link
+                        outputChannel.appendLine(`ERROR: ${link.address} on line ${link.lineText.lineNumber} is not an HTTP/s or relative link.`);
+                    }
+                }
             }
-            // Resolve the promise by returning the diagnostic
-            resolve(brokenLinkDiag);
         });
     });
 }
-                        
+ 
 // Parse the MD style links out of the document
 function getLinks(document: TextDocument): Promise<Link[]> {
     // Return a promise, since this might take a while for large documents
@@ -200,7 +170,7 @@ function getLinks(document: TextDocument): Promise<Link[]> {
             //Reject, because we found no links
             reject;
         }
-    });
+    }).catch();
 }
 
 // Check for addresses that contain country codes
@@ -224,7 +194,12 @@ function isCountryCodeLink(link: Link): Diagnostic {
 // Is this a valid HTTP/S link?
 function isHttpLink(linkToCheck: string): boolean {
     // Use the validator to avoid writing URL checking logic
-    return validator.isURL(linkToCheck, {require_protocol: true}) ? true : false;
+    return validator.isURL(linkToCheck, {require_protocol: true, protocols: ['http','https']}) ? true : false;
+}
+
+// Is this an FTP link?
+function isFtpLink(linkToCheck: string): boolean {
+    return linkToCheck.toLowerCase().startsWith('ftp');
 }
 
 // Generate a diagnostic object
@@ -241,33 +216,3 @@ function createDiagnostic(severity: DiagnosticSeverity, markdownLink, lineText: 
     // Return the diagnostic
     return diag;
 }
-
-class LinkCheckController {
-    private _linkChecker: LinkChecker;
-    private _disposable: Disposable;
-    
-    constructor(linkChecker: LinkChecker) {
-        this._linkChecker = linkChecker;
-        this._linkChecker.diagnoseLinks();
-        
-        // Register a command (broken link check)
-        commands.registerCommand('extension.checkBrokenLinks', checkBrokenLinks);
-        
-        // Subscribe to selection changes
-        let subscriptions: Disposable[] = [];
-        window.onDidChangeTextEditorSelection(this._onEvent, this, subscriptions);
-        window.onDidChangeActiveTextEditor(this._onEvent, this, subscriptions);
-
-        // create a combined disposable from both event subscriptions
-        this._disposable = Disposable.from(...subscriptions);
-    }
-    
-    dispose() {
-        this._disposable.dispose();
-    }
-    
-    private _onEvent() {
-        this._linkChecker.diagnoseLinks();
-    }
-}
-
