@@ -1,5 +1,5 @@
 {
-  "name": "LinkCheck",
+  "name": "LinkCheckMD",
   "displayName": "HTTP/s and relative link checker",
   "description": "Checks Markdown links for the presence of a country-code as you type and flags as a warning. Checks whether HTTP/s links or relative links are reachable when you press Alt+L.",
   "version": "0.1.0",
