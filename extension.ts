@@ -7,7 +7,6 @@ import {
     Diagnostic, 
     DiagnosticSeverity,
     DiagnosticCollection,
-    Location,
     Range,
     OutputChannel,
     Position,
