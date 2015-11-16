@@ -91,21 +91,23 @@ function checkBrokenLinks() {
     getLinks(document).then((links) => {
         // Loop over the links
         links.forEach(link => {
+            // Get the line number, because internally it's 0 based, but not in display
+            let lineNumber = link.lineText.lineNumber + 1;
             // Is it an HTTPS link or a relative link?
             if(isHttpLink(link.address)) {
                 // And check if they are broken or not.
                 brokenLink(link.address, {allowRedirects: true}).then((answer) => {
                     // Log to the outputChannel
                     if(answer) {
-                        outputChannel.appendLine(`Broken: ${link.address} on line ${link.lineText.lineNumber} is unreachable.`);
+                        outputChannel.appendLine(`Broken: ${link.address} on line ${lineNumber} is unreachable.`);
                     } else {
-                        outputChannel.appendLine(`OK: ${link.address} on line ${link.lineText.lineNumber}.`);
+                        outputChannel.appendLine(`OK: ${link.address} on line ${lineNumber}.`);
                     }
                 });
             } else {
                 if(isFtpLink(link.address)) {
                     // We don't do anything with FTP
-                    outputChannel.appendLine(`Unknown: ${link.address} on line ${link.lineText.lineNumber} is an FTP link.`);
+                    outputChannel.appendLine(`Unknown: ${link.address} on line ${lineNumber} is an FTP link.`);
                 } else {
                     // Must be a relative path, but might not be, so try it...
                     try {
@@ -116,13 +118,13 @@ function checkBrokenLinks() {
                         let fullPath = path.resolve(currentWorkingDirectory, link.address).split('#')[0];
                         // Check if the file exists and log appropriately
                         if(fs.existsSync(fullPath)) {
-                            outputChannel.appendLine(`OK: ${link.address} on line ${link.lineText.lineNumber}.`);
+                            outputChannel.appendLine(`OK: ${link.address} on line ${lineNumber}.`);
                         } else {
-                            outputChannel.appendLine(`Broken: ${link.address} on line ${link.lineText.lineNumber} does not exist.`);
+                            outputChannel.appendLine(`Broken: ${link.address} on line ${lineNumber} does not exist.`);
                         }
                     } catch (error) {
                         // If there's an error, log the link
-                        outputChannel.appendLine(`ERROR: ${link.address} on line ${link.lineText.lineNumber} is not an HTTP/s or relative link.`);
+                        outputChannel.appendLine(`ERROR: ${link.address} on line ${lineNumber} is not an HTTP/s or relative link.`);
                     }
                 }
             }

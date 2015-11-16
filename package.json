@@ -3,8 +3,8 @@
   "displayName": "HTTP/s and relative link checker",
   "description": "Checks Markdown links for the presence of a country-code as you type and flags as a warning. Checks whether HTTP/s links or relative links are reachable when you press Alt+L.",
   "icon": "images/linkcheckermdicon.svg",
-  "version": "0.1.1",
-  "publisher": "Larry Franks & Ralph Squillace",
+  "version": "0.1.3",
+  "publisher": "blackmist",
   "galleryBanner": {
     "color": "#0000FF",
     "theme": "dark"
