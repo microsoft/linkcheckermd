@@ -47,7 +47,7 @@ export function activate(disposables: Disposable[]) {
         checkLinks(event, diagnostics);
     }, undefined, disposables);
     
-    commands.registerCommand('extension.checkBrokenLinks', checkBrokenLinks);
+    commands.registerCommand('extension.generateLinkReport', generateLinkReport);
 }
 
 /*
@@ -79,7 +79,8 @@ function checkLinks(document: TextDocument, diagnostics: DiagnosticCollection) {
     }).catch();
 }
 
-function checkBrokenLinks() {
+// Generate a report of broken, country code, etc. links and the line they occur on
+function generateLinkReport() {
     // Get the current document
     let document = window.activeTextEditor.document;
     // Create an output channel for displaying broken links
@@ -93,21 +94,26 @@ function checkBrokenLinks() {
         links.forEach(link => {
             // Get the line number, because internally it's 0 based, but not in display
             let lineNumber = link.lineText.lineNumber + 1;
+            
             // Is it an HTTPS link or a relative link?
             if(isHttpLink(link.address)) {
                 // And check if they are broken or not.
                 brokenLink(link.address, {allowRedirects: true}).then((answer) => {
+                    // Also check for country code
+                    if(hasCountryCode(link.address)) {
+                        outputChannel.appendLine(`Warning: ${link.address} on line ${lineNumber} contains a country code.`);
+                    }
                     // Log to the outputChannel
                     if(answer) {
-                        outputChannel.appendLine(`Broken: ${link.address} on line ${lineNumber} is unreachable.`);
+                        outputChannel.appendLine(`Error: ${link.address} on line ${lineNumber} is unreachable.`);
                     } else {
-                        outputChannel.appendLine(`OK: ${link.address} on line ${lineNumber}.`);
+                        outputChannel.appendLine(`Info: ${link.address} on line ${lineNumber}.`);
                     }
                 });
             } else {
                 if(isFtpLink(link.address)) {
                     // We don't do anything with FTP
-                    outputChannel.appendLine(`Unknown: ${link.address} on line ${lineNumber} is an FTP link.`);
+                    outputChannel.appendLine(`Info: ${link.address} on line ${lineNumber} is an FTP link.`);
                 } else {
                     // Must be a relative path, but might not be, so try it...
                     try {
@@ -118,13 +124,13 @@ function checkBrokenLinks() {
                         let fullPath = path.resolve(currentWorkingDirectory, link.address).split('#')[0];
                         // Check if the file exists and log appropriately
                         if(fs.existsSync(fullPath)) {
-                            outputChannel.appendLine(`OK: ${link.address} on line ${lineNumber}.`);
+                            outputChannel.appendLine(`Info: ${link.address} on line ${lineNumber}.`);
                         } else {
-                            outputChannel.appendLine(`Broken: ${link.address} on line ${lineNumber} does not exist.`);
+                            outputChannel.appendLine(`Error: ${link.address} on line ${lineNumber} does not exist.`);
                         }
                     } catch (error) {
                         // If there's an error, log the link
-                        outputChannel.appendLine(`ERROR: ${link.address} on line ${lineNumber} is not an HTTP/s or relative link.`);
+                        outputChannel.appendLine(`Error: ${link.address} on line ${lineNumber} is not an HTTP/s or relative link.`);
                     }
                 }
             }
@@ -178,10 +184,9 @@ function getLinks(document: TextDocument): Promise<Link[]> {
 // Check for addresses that contain country codes
 function isCountryCodeLink(link: Link): Diagnostic {
     let countryCodeDiag=null;
-    //Regex for country-code
-    let hasCountryCode = link.address.match(/\/[a-z]{2}\-[a-z]{2}\//);
+    
     //If one was found...
-    if(hasCountryCode) {
+    if(hasCountryCode(link.address)) {
         //Create the diagnostics object
         countryCodeDiag = createDiagnostic(
             DiagnosticSeverity.Warning,
@@ -191,6 +196,12 @@ function isCountryCodeLink(link: Link): Diagnostic {
         );
     }
     return countryCodeDiag;
+}
+
+function hasCountryCode(linkToCheck: string): boolean {
+    //Regex for country-code
+    let hasCountryCode = linkToCheck.match(/\/[a-z]{2}\-[a-z]{2}\//);
+    return hasCountryCode ? true : false;
 }
 
 // Is this a valid HTTP/S link?

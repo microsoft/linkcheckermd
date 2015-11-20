@@ -3,7 +3,7 @@
   "displayName": "HTTP/s and relative link checker",
   "description": "Checks Markdown links for the presence of a country-code as you type and flags as a warning. Checks whether HTTP/s links or relative links are reachable when you press Alt+L.",
   "icon": "images/linkcheckermdicon.svg",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "publisher": "blackmist",
   "galleryBanner": {
     "color": "#0000FF",
@@ -36,19 +36,20 @@
   "contributes": {
     "commands": [
       {
-        "command": "extension.checkBrokenLinks",
-        "title": "Remove country-code suggestions"
+        "command": "extension.generateLinkReport",
+        "title": "Generate a link report"
       }
     ],
     "keybindings": [
       {
-        "command": "extension.checkBrokenLinks",
+        "command": "extension.generateLinkReport",
         "key": "Alt+L"
       }
     ]
   },
   "devDependencies": {
-    "vscode": "*"
+    "vscode": "*",
+    "typescript": "*"
   },
   "dependencies": {
     "broken-link": "^1.0.1",
