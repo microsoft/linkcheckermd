@@ -1,4 +1,5 @@
 # Functionality
+
 Load a Markdown file and get highlights and hovers for links that contain a country code (en-us for example.)
 
 If you use Alt+L, it will generate a report on the links in the document, including broken links. It attempts to check broken links by trying to resolve HTTP & HTTPS links, and relative links (../folder/file.md) by checking if the file exist on the local file system. The result of these checks are logged in an output window on the right of the editor.
