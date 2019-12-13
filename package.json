@@ -2,8 +2,8 @@
   "name": "LinkCheckMD",
   "displayName": "HTTP/s and relative link checker",
   "description": "Checks Markdown links for the presence of a country-code as you type and flags as a warning. Checks whether HTTP/s links or relative links are reachable when you press Alt+L.",
-  "icon": "images/linkcheckermdicon.svg",
-  "version": "0.1.5",
+  "icon": "images/linkcheckermdicon.png",
+  "version": "0.2.0",
   "publisher": "blackmist",
   "galleryBanner": {
     "color": "#0000FF",
@@ -20,7 +20,8 @@
     "url": "https://github.com/microsoft/linkcheckermd.git"
   },
   "categories": [
-    "Linters", "Other"
+    "Linters",
+    "Other"
   ],
   "engines": {
     "vscode": "0.10.x"
@@ -30,8 +31,9 @@
   ],
   "main": "./out/extension",
   "scripts": {
-    "vscode:prepublish": "node ./node_modules/vscode/bin/compile",
-    "compile": "node ./node_modules/vscode/bin/compile -watch -p ./"
+    "vscode:prepublish": "tsc -p ./",
+    "compile": "tsc -watch -p ./",
+    "postinstall": "node ./node_modules/vscode/bin/install"
   },
   "contributes": {
     "commands": [
@@ -48,8 +50,11 @@
     ]
   },
   "devDependencies": {
-    "vscode": "*",
-    "typescript": "*"
+    "typescript": "^2.0.3",
+    "vscode": "^1.0.0",
+    "mocha": "^2.3.3",
+    "@types/node": "^6.0.40",
+    "@types/mocha": "^2.2.32"
   },
   "dependencies": {
     "broken-link": "^1.0.1",
