@@ -200,7 +200,7 @@ function isCountryCodeLink(link: Link): Diagnostic {
 
 function hasCountryCode(linkToCheck: string): boolean {
     //Regex for country-code
-    let hasCountryCode = linkToCheck.match(/\/[a-z]{2}\-[a-z]{2}\//);
+    let hasCountryCode = linkToCheck.match(/(.com|aka\.ms)\/[a-z]{2}\-[a-z]{2}\//);
     return hasCountryCode ? true : false;
 }
 
