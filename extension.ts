@@ -152,16 +152,16 @@ function getLinks(document: TextDocument): Promise<Link[]> {
             // Get the text for the current line
             let lineText = document.lineAt(lineNumber);
             // Are there links?
-            let links = lineText.text.match(/\[[^\[]+\]\([^\)]+\)|\[[a-zA-z0-9_-]+\]:\s*\S+/g);
+            let links = lineText.text.match(/\[[^\[]+\]\(([^\)]+(\)[a-zA-Z0-9-]*.\w*\)|\)))|\[[a-zA-z0-9_-]+\]:\s*(\S+)/g);
             if(links) {
                 // Iterate over the links found on this line
                 for(let i = 0; i< links.length; i++) {
                     // Get the URL from each individual link
                     // ([^\)]+) captures inline style link address
                     // (\S+) captures reference style link address
-                    var link = links[i].match(/\[[^\[]+\]\(([^\)]+)\)|\[[a-zA-z0-9_-]+\]:\s*(\S+)/);
+                    var link = links[i].match(/\[[^\[]+\]\(([^\)]+(\)[a-zA-Z0-9-]*.\w+\)|\)))|\[[a-zA-z0-9_-]+\]:\s*(\S+)/);
                     // Figure out which capture contains the address; inline style or reference
-                    let address = (link[2] == null) ? link[1] : link[2];
+                    let address = (link[3] == null) ? link[1].slice(0, -1) : link[3];
                     //Push it to the array
                     linksToReturn.push({
                         text: link[0],
