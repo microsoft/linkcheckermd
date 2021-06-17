@@ -13,15 +13,25 @@ Open Visual Studio Code and press `F1`; a field will appear at the top of the wi
 
 ![Animated GIF of installing the extension](./images/install.gif)
 
-## Check for country code
+## Rules
 
-Checking for country codes in links happens as you type, and will underline links with green.
+### LNK0001: Check for country code
+
+This rule checks links for language identifiers, such as `en-us`.
 
 ## Check for broken links
 
 To check for broken links, use Alt+L. This will open a new column to the right of the VSCode window and display the status of the links as they are checked.
 
 ## Changes
+
+### 0.3.0
+
+- Added configuration setting to disable the country code rule
+
+### 0.2.0
+
+- Fixed a bug preventing links with parentheses from being correctly parsed
 
 ### 0.1.5
 
