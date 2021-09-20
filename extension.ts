@@ -14,7 +14,8 @@ import {
     Disposable,
     TextDocument,
     TextLine,
-    ViewColumn} from 'vscode';
+    ViewColumn,
+    WorkspaceConfiguration} from 'vscode';
 // For HTTP/s address validation
 import validator = require('validator');
 // For checking broken links
@@ -29,6 +30,10 @@ interface Link {
     address: string
     lineText: TextLine
 }
+
+const configSection = "linkcheckmd";
+
+let configuration: WorkspaceConfiguration = workspace.getConfiguration(configSection);
 
 // this method is called when your extension is activated
 // your extension is activated the very first time the command is executed
@@ -46,6 +51,12 @@ export function activate(disposables: Disposable[]) {
     workspace.onDidOpenTextDocument(event => {
         checkLinks(event, diagnostics);
     }, undefined, disposables);
+
+    workspace.onDidChangeConfiguration(event => {
+        if (event.affectsConfiguration(configSection)) {
+            configuration = workspace.getConfiguration(configSection);
+        }
+    });
     
     commands.registerCommand('extension.generateLinkReport', generateLinkReport);
 }
@@ -61,21 +72,23 @@ export function activate(disposables: Disposable[]) {
 function checkLinks(document: TextDocument, diagnostics: DiagnosticCollection) {
     //Clear the diagnostics because we're sending new ones each time
     diagnostics.clear();
-    // Get all Markdown style lnks in the document
+    // Get all Markdown style links in the document
     getLinks(document).then((links) => {
-        // Iterate over the array, generating an array of promises
-        let countryCodePromise = Promise.all<Diagnostic>(links.map((link): Diagnostic => {
-            // For each link, check the country code...
-            return isCountryCodeLink(link);
-            // Then, when they are all done..
-        }));
-        // Finally, let's complete the promise for country code...
-        countryCodePromise.then((countryCodeDiag) => {
-                // Then filter out null ones
-                let filteredDiag = countryCodeDiag.filter(diagnostic => diagnostic != null);
-                // Then add the diagnostics
-                diagnostics.set(document.uri, filteredDiag);
-            })
+        if (configuration.get("enableCountryCodeCheck", true)) {
+            // Iterate over the array, generating an array of promises
+            let countryCodePromise = Promise.all<Diagnostic>(links.map((link): Diagnostic => {
+                // For each link, check the country code...
+                return isCountryCodeLink(link);
+                // Then, when they are all done..
+            }));
+            // Finally, let's complete the promise for country code...
+            countryCodePromise.then((countryCodeDiag) => {
+                    // Then filter out null ones
+                    let filteredDiag = countryCodeDiag.filter(diagnostic => diagnostic != null);
+                    // Then add the diagnostics
+                    diagnostics.set(document.uri, filteredDiag);
+                })
+        }
     }).catch();
 }
 
@@ -100,8 +113,8 @@ function generateLinkReport() {
                 // And check if they are broken or not.
                 brokenLink(link.address, {allowRedirects: true}).then((answer) => {
                     // Also check for country code
-                    if(hasCountryCode(link.address)) {
-                        outputChannel.appendLine(`Warning: ${link.address} on line ${lineNumber} contains a country code.`);
+                    if(configuration.get("enableCountryCodeCheck", true) && hasCountryCode(link.address)) {
+                        outputChannel.appendLine(`Warning: ${link.address} on line ${lineNumber} contains a language reference code.`);
                     }
                     // Log to the outputChannel
                     if(answer) {
@@ -192,7 +205,8 @@ function isCountryCodeLink(link: Link): Diagnostic {
             DiagnosticSeverity.Warning,
             link.text,
             link.lineText,
-            `Link ${link.address} contains a language reference: ${hasCountryCode[0]} `
+            `Link ${link.address} contains a language reference code.`,
+            'LNK0001'
         );
     }
     return countryCodeDiag;
@@ -216,7 +230,7 @@ function isFtpLink(linkToCheck: string): boolean {
 }
 
 // Generate a diagnostic object
-function createDiagnostic(severity: DiagnosticSeverity, markdownLink, lineText: TextLine, message): Diagnostic {
+function createDiagnostic(severity: DiagnosticSeverity, markdownLink, lineText: TextLine, message, code): Diagnostic {
     // Get the location of the text in the document
     // based on position within the line of text it occurs in
     let startPos = lineText.text.indexOf(markdownLink);
@@ -226,6 +240,7 @@ function createDiagnostic(severity: DiagnosticSeverity, markdownLink, lineText: 
     let range = new Range(start, end);
     // Create the diagnostic object
     let diag = new Diagnostic(range, message, severity);
+    diag.code = code;
     // Return the diagnostic
     return diag;
 }
