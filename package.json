@@ -3,7 +3,7 @@
   "displayName": "HTTP/s and relative link checker",
   "description": "Checks Markdown links for the presence of a country-code as you type and flags as a warning. Checks whether HTTP/s links or relative links are reachable when you press Alt+L.",
   "icon": "images/linkcheckermdicon.png",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "publisher": "blackmist",
   "galleryBanner": {
     "color": "#0000FF",
@@ -47,7 +47,17 @@
         "command": "extension.generateLinkReport",
         "key": "Alt+L"
       }
-    ]
+    ],
+    "configuration": {
+      "title": "LinkCheckMD",
+      "properties": {
+        "linkcheckmd.enableCountryCodeCheck": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable checking links for hard-coded language identifiers (LNK0001)."
+        }
+      }
+    }
   },
   "devDependencies": {
     "@types/mocha": "^2.2.32",
