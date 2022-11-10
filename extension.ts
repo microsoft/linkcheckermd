@@ -241,6 +241,7 @@ function createDiagnostic(severity: DiagnosticSeverity, markdownLink, lineText: 
     // Create the diagnostic object
     let diag = new Diagnostic(range, message, severity);
     diag.code = code;
+    diag.source = "linkcheckmd";
     // Return the diagnostic
     return diag;
 }
